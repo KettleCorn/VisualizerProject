@@ -9,27 +9,34 @@
   * and car stereos.
   */
 
-import ddf.minim.analysis.*;
+import ddf.minim.analysis.*; //req libs
 import ddf.minim.*;
 
-Minim       minim;
-AudioPlayer jingle;
-FFT fftLin;
-FFT         fft;
-float oldAv = 0;
-float flux ;
-color mybg;
-Ball myBall;
-ArrayList<Ball> myBalls = new ArrayList<Ball>();
-float[] samples = new float[1024];
-float[] spectrum = new float[1024 / 2 + 1];
-float[] lastSpectrum = new float[1024 / 2 + 1];
-//List<Float> spectralFlux = new ArrayList<Float>( );
+/**************
+* Audio Logic *
+***************/
+Minim minim; //audio processor object
+AudioPlayer jingle; //audio source
+FFT fftLin; //FFT for linear averaging
+FFT fft; //FFT to use normally (is it used?)
+float oldAv = 0; //previous average
+float flux ; //flux rate i dont know if this was being calculated quite right
+              //see http://www.badlogicgames.com/wordpress/?p=161
+float[] spectrum = new float[1024 / 2 + 1]; //hold all observed values
+float[] lastSpectrum = new float[1024 / 2 + 1]; //previous values
+float[] samples = new float[1024]; //not used right now, see prior link
 
-void setup()
+/*************
+* Game Logic *
+**************/
+color mybg; //store color value not really needed can be done dynamically quick
+Ball myBall; //object to hold temporary instances when making new ball objects
+ArrayList<Ball> myBalls = new ArrayList<Ball>(); //hold all the active ball objects
+
+void setup() //run once
 {
-  size(512, 200, P3D);
-  minim = new Minim(this);
+  size(512, 200, P3D); //window size
+  minim = new Minim(this);//init audio lib
   
   // specify that we want the audio buffers of the AudioPlayer
   // to be 1024 samples long because our FFT needs to have 
@@ -43,50 +50,62 @@ void setup()
   // the same size as jingle's sample buffer
   // note that this needs to be a power of two 
   // and that it means the size of the spectrum will be half as large.
-  fft = new FFT( jingle.bufferSize(), jingle.sampleRate() );
-  fftLin = new FFT( jingle.bufferSize(), jingle.sampleRate() );
+  fft = new FFT( jingle.bufferSize(), jingle.sampleRate() ); //basic
+  fftLin = new FFT( jingle.bufferSize(), jingle.sampleRate() ); //for lin average
   
   // calculate the averages by grouping frequency bands linearly. use 30 averages.
   fftLin.linAverages( 30 );
-  mybg = color(0,0,0);
+  mybg = color(0,0,0);//set black background
 }
 
-void draw()
+void draw() //called over and over
 {
-  background(mybg);
+  background(mybg); //redraw background first
   
   // perform a forward FFT on the samples in jingle's mix buffer,
   // which contains the mix of both the left and right channels of the file
   fft.forward( jingle.mix );
   fftLin.forward( jingle.mix);
-  System.arraycopy( spectrum, 0, lastSpectrum, 0, spectrum.length ); 
-  //System.arraycopy( fft.getSpectrum(), 0, spectrum, 0, spectrum.length );
-  flux = 0; 
-  float newAv = 0;
-  for(int i = 0; i < fftLin.specSize(); i++)
+  
+  System.arraycopy( spectrum, 0, lastSpectrum, 0, spectrum.length ); //previous specturm is last spectrum
+  flux = 0; //start flux at 0 probably better ways to do this
+  float newAv = 0; //reset value
+  for(int i = 0; i < fftLin.specSize(); i++) //go through the fft range
   {
     //println(fft.specSize());
-    spectrum[i]= fftLin.getBand(i);
-    newAv+= spectrum[i];
-    float value = (spectrum[i] - lastSpectrum[i]);      
-      flux += value < 0? 0: value;
-    // draw the line for frequency band i, scaling it up a bit so we can see it
+    spectrum[i]= fftLin.getBand(i);//copy the value of the band
+    newAv+= spectrum[i]; //add that to the averaging sum
+    float value = (spectrum[i] - lastSpectrum[i]); //create flux out of the difference
+      flux += value < 0? 0: value; //dont add negatives, forget why at the moment
     
+    // draw the line for frequency band i, scaling it up a bit so we can see it
     stroke(255);
-    line( i, height, i, height - fft.getBand(i)*8 );
-    stroke(color(255,0,0));
+    line( i, height, i, height - fft.getBand(i)*8 ); //this is the bouncing lines at the bottom
+   
   }
-    line(0,height-flux*8,width,height-flux*8+3);
-   newAv = newAv / fftLin.specSize();
-   if(newAv > oldAv *2.2){
-  //   mybg = color(random(255), random(255), random(255));
+   stroke(color(255,0,0)); //draw flux line
+   line(0,height-flux*8,width,height-flux*8+3);
+   
+   newAv = newAv / fftLin.specSize(); //average the sum
+   if(newAv > oldAv *2.2){ //big enough spike
+      //   mybg = color(random(255), random(255), random(255));
+      makeABall();
+   }
+   oldAv = newAv; //apply to be the new prior
+   
+   doGame();
+  // println(hex(c));
+}
+
+void makeABall(){
     myBall = new Ball(20);  
     myBall.setX(width);
     myBall.setY(random(height));
     myBalls.add(myBall);
-   }
-   oldAv = newAv;
-   for(int y = myBalls.size()-1; y >= 0; y--){
+}
+
+void doGame(){
+  for(int y = myBalls.size()-1; y >= 0; y--){
      myBalls.get(y).left();
      if(myBalls.get(y).offscreen()){
        myBalls.remove(y);
@@ -97,5 +116,4 @@ void draw()
        }
      }
    }
-  // println(hex(c));
 }
