@@ -20,7 +20,7 @@ float oldAv = 0;
 float flux ;
 color mybg;
 Ball myBall;
-
+ArrayList<Ball> myBalls = new ArrayList<Ball>();
 float[] samples = new float[1024];
 float[] spectrum = new float[1024 / 2 + 1];
 float[] lastSpectrum = new float[1024 / 2 + 1];
@@ -29,14 +29,12 @@ float[] lastSpectrum = new float[1024 / 2 + 1];
 void setup()
 {
   size(512, 200, P3D);
-  myBall = new Ball(20);  
-  myBall.setX(width/2);
   minim = new Minim(this);
   
   // specify that we want the audio buffers of the AudioPlayer
   // to be 1024 samples long because our FFT needs to have 
   // a power-of-two buffer size and this is a good size.
-  jingle = minim.loadFile("macca.mp3", 1024);
+  jingle = minim.loadFile("weexist.mp3", 1024);
   
   // loop the file indefinitely
   jingle.loop();
@@ -79,24 +77,25 @@ void draw()
     stroke(color(255,0,0));
   }
     line(0,height-flux*8,width,height-flux*8+3);
-   myBall.setY(height-flux*8);
    newAv = newAv / fftLin.specSize();
    if(newAv > oldAv *2.2){
-     mybg = color(random(255), random(255), random(255));
+  //   mybg = color(random(255), random(255), random(255));
+    myBall = new Ball(20);  
+    myBall.setX(width);
+    myBall.setY(random(height));
+    myBalls.add(myBall);
    }
    oldAv = newAv;
-   
-   myBall.draw();
+   for(int y = myBalls.size()-1; y >= 0; y--){
+     myBalls.get(y).left();
+     if(myBalls.get(y).offscreen()){
+       myBalls.remove(y);
+     }else{
+       myBalls.get(y).draw();
+       if(myBalls.get(y).isat(mouseX,mouseY)){
+         mybg = color(255,0,0);
+       }
+     }
+   }
+  // println(hex(c));
 }
-
-void keyPressed(){
-  if (key == CODED) {
-    if (keyCode == LEFT) {
-      myBall.left();
-    }
-    if (keyCode == RIGHT){
-      myBall.right();
-    }
-  }
-}
-  
