@@ -19,17 +19,19 @@ import java.util.Arrays;
 Minim minim; //audio processor object
 AudioPlayer jingle; //audio source (playback)
 AudioSample jingle2; //audio source (pre analysis)
+String filename = "hey.mp3";
 
 FFT fft; //FFT to use
 float[] spectrum = new float[1024 / 2 + 1]; //hold all observed values from the fft transform
 float[] lastSpectrum = new float[1024 / 2 + 1]; //previous values
 float[][] spectras; //hold all values from the fft transforms
+float[] amps; //hold relative amplitudes of chunks
 
 float flux ; //flux rate between spectrum samples
 ArrayList<Float> spectralFlux = new ArrayList<Float>();//hold all flux values
 
 int threshold_window = 15; //how many samples to look nearby at when determining threshold
-float multiplier = 1.6; //how much of a difference from the average a beat onset should be marked by
+float multiplier = 1.5; //how much of a difference from the average a beat onset should be marked by
 ArrayList<Float> threshold = new ArrayList<Float>(); //averages of flux values for finding onsets
 
 ArrayList<Float> prunedFlux = new ArrayList<Float>(); //filtered flux values based on the threshold
@@ -60,8 +62,8 @@ void setup() //run once
   // specify that we want the audio buffers of the AudioPlayer
   // to be 1024 samples long because our FFT needs to have 
   // a power-of-two buffer size and this is a good size.
-  jingle = minim.loadFile("weexist2.mp3", 1024);
-  jingle2 = minim.loadSample("weexist2.mp3",1024);
+  jingle = minim.loadFile(filename, 1024);
+  jingle2 = minim.loadSample(filename,1024);
   
   //visual environment
   mybg = color(0,0,0);//set black background
@@ -79,14 +81,16 @@ void setup() //run once
 void draw() //called over and over
 {
   background(mybg); //redraw background first
-  drawGraph(spectralFlux,color(0,255,0)); //draw the flux
+  drawGraph(spectralFlux,color(0,255,255)); //draw the flux
+  drawGraph(peaks,color(0,255,0)); //draw the flux
   drawGraph(threshold,color(255,255,255)); //draw the threshold
   time = millis() - starttime; //time since started playing
   spectraidx = int((time)/23.297);//convert to associated chunk index *****MAGIC NUMBER I WANT TO FIGURE OUT*******
+  //println(spectraidx+","+spectras.length+","+peaks.size());
   if (spectraidx < spectras.length){ //if its in bounds
       stroke(color(255,0,0)); //draw with red
-      float fluxY = (height*3/4) - 
-        (spectralFlux.get(spectraidx)/maxFlux) * (height*3/4 - 10); //3/4 down screen, up ratio of flux as percentage of highest, up to top of window
+      float fluxY = (height*4/5) - 
+        (spectralFlux.get(spectraidx)/maxFlux) * (height*3/5); //3/4 down screen, up ratio of flux as percentage of highest, up to top of window
       line(0,fluxY,width,fluxY); //make the instantaneous flux horizontal line across the screen
      
       stroke(color(255,255,0)); //yellow
@@ -105,8 +109,10 @@ void draw() //called over and over
           lastblue = max(0,lastblue -10); //decrease blue intensity
         }
       }
-      mybg = color(0,0,lastblue);  //assign the background colour
-  }
+      //assign the background colour
+      //blue based on beat, r/g based on relative amplitude
+      mybg = color(64-amps[spectraidx]/2,amps[spectraidx],lastblue);  
+    }
   lastidx = spectraidx;//just done index point
  
    doGame(); //do stuff with the balls
@@ -116,7 +122,7 @@ void draw() //called over and over
 void makeABall(float size){//take a size and make a ball on the right of the screen
     myBall = new Ball(size);  
     myBall.setX(width);
-    myBall.setY(height/2);//random(height));
+    myBall.setY(height/2+random(-height/3,height/3));
     myBalls.add(myBall);
 }
 
@@ -141,6 +147,7 @@ void doAnalysis(){
   calcThresholds();
   calcPrunes();
   calcPeaks();
+  calcAmps();
 }
 
 void calcSpectras(){
@@ -237,6 +244,26 @@ void calcPeaks(){
   peaks.add(0.0); //end cant be checked
 }
 
+//this one just adds the spectras together and makes an array 
+//holding the relative amplitudes from 0 to 255
+void calcAmps(){
+  amps = new float[spectras.length];
+  float biggest = 0;
+  for (int n = 0; n < spectras.length; n++){
+    float temp = 0;
+    for (int i = 0; i < spectras[n].length; i++){
+      temp+= spectras[n][i];
+    }
+    amps[n] = temp;
+    if (temp > biggest){
+      biggest = temp;
+    }
+  }
+  for (int n = 0; n < amps.length; n++){
+    amps[n] = amps[n]/biggest * 128;
+  }   
+}
+
 //plot a graph of floats
 void drawGraph(ArrayList<Float> alf, color c){
   stroke(c);
@@ -245,8 +272,8 @@ void drawGraph(ArrayList<Float> alf, color c){
   float prevX = 0;
   for (int n = 0; n < w; n++){
     float newX = n/w * width;
-    float newY = (height*3/4) - 
-        (alf.get(n)/maxFlux) * (height*3/4 - 10);
+    float newY = (height*4/5) - 
+        (alf.get(n)/maxFlux) * (height*3/5);
     line(prevX,prevY,newX,newY);
     prevX = newX;
     prevY = newY;
