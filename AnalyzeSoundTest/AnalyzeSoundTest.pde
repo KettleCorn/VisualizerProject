@@ -11,12 +11,16 @@
 
 import ddf.minim.analysis.*; //req libs
 import ddf.minim.*;
+import ddf.minim.spi.*;
+
+import java.util.Arrays;
 
 /**************
 * Audio Logic *
 ***************/
 Minim minim; //audio processor object
 AudioPlayer jingle; //audio source
+AudioSample jingle2;
 FFT fftLin; //FFT for linear averaging
 FFT fft; //FFT to use normally (is it used?)
 float oldAv = 0; //previous average
@@ -24,8 +28,9 @@ float flux ; //flux rate i dont know if this was being calculated quite right
               //see http://www.badlogicgames.com/wordpress/?p=161
 float[] spectrum = new float[1024 / 2 + 1]; //hold all observed values
 float[] lastSpectrum = new float[1024 / 2 + 1]; //previous values
-float[] samples = new float[1024]; //not used right now, see prior link
+float[][] spectras; //not used right now, see prior link
 
+int spectraidx = 0;
 /*************
 * Game Logic *
 **************/
@@ -41,31 +46,44 @@ void setup() //run once
   // specify that we want the audio buffers of the AudioPlayer
   // to be 1024 samples long because our FFT needs to have 
   // a power-of-two buffer size and this is a good size.
-  jingle = minim.loadFile("weexist.mp3", 1024);
-  
+  jingle = minim.loadFile("ww.mp3", 2048);
+  jingle2 = minim.loadSample("ww.mp3",2048);
   // loop the file indefinitely
-  jingle.loop();
+  //jingle.loop();
   
   // create an FFT object that has a time-domain buffer 
   // the same size as jingle's sample buffer
   // note that this needs to be a power of two 
   // and that it means the size of the spectrum will be half as large.
-  fft = new FFT( jingle.bufferSize(), jingle.sampleRate() ); //basic
-  fftLin = new FFT( jingle.bufferSize(), jingle.sampleRate() ); //for lin average
+  //fftLin = new FFT( jingle2.bufferSize(), jingle2.sampleRate() ); //for lin average
   
   // calculate the averages by grouping frequency bands linearly. use 30 averages.
-  fftLin.linAverages( 30 );
+  //fftLin.linAverages( 30 );
   mybg = color(0,0,0);//set black background
+  calcSpectras();
+  jingle.play();
 }
 
 void draw() //called over and over
 {
   background(mybg); //redraw background first
-  
+  spectraidx = int(jingle.position()/23.297);
+  //spectraidx++;
+  //println(spectras.length);
+  println(spectraidx);
+  if (spectraidx < spectras.length){
+    for(int i = 0; i < spectras[spectraidx].length; i++) //go through the fft range
+    {
+      //println(fft.specSize());
+      spectrum[i]= spectras[spectraidx][i];//copy the value of the band
+      stroke(255);
+      line( i, height, i, height - spectras[spectraidx][i] ); //this is the bouncing lines at the bottom
+    }
+  }
+  /*
   // perform a forward FFT on the samples in jingle's mix buffer,
   // which contains the mix of both the left and right channels of the file
-  fft.forward( jingle.mix );
-  fftLin.forward( jingle.mix);
+  fftLin.forward( jingle2.mix);
   
   System.arraycopy( spectrum, 0, lastSpectrum, 0, spectrum.length ); //previous specturm is last spectrum
   flux = 0; //start flux at 0 probably better ways to do this
@@ -80,19 +98,20 @@ void draw() //called over and over
     
     // draw the line for frequency band i, scaling it up a bit so we can see it
     stroke(255);
-    line( i, height, i, height - fft.getBand(i)*8 ); //this is the bouncing lines at the bottom
+    line( i, height, i, height - fftLin.getBand(i)*8 ); //this is the bouncing lines at the bottom
    
   }
    stroke(color(255,0,0)); //draw flux line
    line(0,height-flux*8,width,height-flux*8+3);
    
    newAv = newAv / fftLin.specSize(); //average the sum
+   println(newAv);
    if(newAv > oldAv *2.2){ //big enough spike
       //   mybg = color(random(255), random(255), random(255));
       makeABall();
    }
    oldAv = newAv; //apply to be the new prior
-   
+   */
    doGame();
   // println(hex(c));
 }
@@ -117,3 +136,44 @@ void doGame(){
      }
    }
 }
+
+void calcSpectras(){
+  //fill up a big array of all the spectra
+  float[]  rightChannel = jingle2.getChannel(AudioSample.RIGHT);
+  float[]  leftChannel = jingle2.getChannel(AudioSample.LEFT);
+  int fftSpread = 1024;
+  float[] fftsamps = new float[fftSpread];
+  FFT fft = new FFT(fftSpread, jingle2.sampleRate());
+  
+  int chunkCount = (leftChannel.length/fftSpread) + 1;
+  
+  spectras = new float[chunkCount][fftSpread/2];
+  
+  for (int n = 0; n < rightChannel.length; n++){
+    leftChannel[n] = leftChannel[n] + rightChannel[n];
+  }
+  
+  for(int idx = 0; idx < chunkCount; idx++){
+    int startpoint = idx * fftSpread;
+    int chunksize = min(leftChannel.length - startpoint, fftSpread);
+    arraycopy(leftChannel, startpoint, fftsamps, 0, chunksize);
+    if (chunksize < fftSpread){
+      Arrays.fill(fftsamps, chunksize, fftsamps.length-1, 0.0);
+    }
+    fft.forward(fftsamps);
+    for(int i = 0; i < 512; i++){
+      spectras[idx][i] = fft.getBand(i);
+    }
+  }
+}
+
+void calcFluxes(){
+  //fill up a big array of all the flux 
+  
+}
+
+void calcThresholds(){
+  //fill up a big array of all the thresholds
+}
+
+
