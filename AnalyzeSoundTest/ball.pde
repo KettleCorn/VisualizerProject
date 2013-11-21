@@ -3,7 +3,7 @@ class Ball{
   private float x;
   private float y;
   
-  Ball(int s){
+  Ball(float s){
     size = s; 
   }
   
