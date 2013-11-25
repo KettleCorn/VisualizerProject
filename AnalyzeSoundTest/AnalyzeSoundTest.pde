@@ -12,6 +12,7 @@ import ddf.minim.analysis.*; //required libs
 import ddf.minim.*;
 import ddf.minim.spi.*;
 import java.util.Arrays;
+import java.util.Map;
 
 /************************
 * Audio Logic Variables *
@@ -26,7 +27,6 @@ float[] spectrum = new float[1024 / 2 + 1]; //hold all observed values from the 
 float[] lastSpectrum = new float[1024 / 2 + 1]; //previous values
 float[][] spectras; //hold all values from the fft transforms
 float[] amps; //hold relative amplitudes of chunks
-
 float flux ; //flux rate between spectrum samples
 ArrayList<Float> spectralFlux = new ArrayList<Float>();//hold all flux values
 
@@ -51,7 +51,12 @@ int starttime = 0; //track beginning of play
 color mybg; //store color value not really needed can be done dynamically quick
 Ball myBall; //object to hold temporary instances when making new ball objects
 ArrayList<Ball> myBalls = new ArrayList<Ball>(); //hold all the active ball objects
+Ship myShip = new Ship();
 int lastblue = 0; //previous blue value of background
+int score = 0;
+
+//Keep track of which arrow keys are down for ship movement
+HashMap<String, Boolean> keysDown = new HashMap<String, Boolean>();
 
 void setup() //run once
 {
@@ -113,13 +118,17 @@ void draw() //called over and over
       //blue based on beat, r/g based on relative amplitude
       mybg = color(64-amps[spectraidx]/2,amps[spectraidx],lastblue);  
     }
-  lastidx = spectraidx;//just done index point
- 
-   doGame(); //do stuff with the balls
+   lastidx = spectraidx;//just done index point
+   myShip.draw();
+   textSize(20);
+   fill(255,255,255);
+   text("Score: "+score, 8, 22);
+   doGame(); //update balls and ship movement
+   
 }
 
-
 void makeABall(float size){//take a size and make a ball on the right of the screen
+    size *= 4;
     myBall = new Ball(size);  
     myBall.setX(width);
     myBall.setY(height/2+random(-height/3,height/3));
@@ -127,18 +136,110 @@ void makeABall(float size){//take a size and make a ball on the right of the scr
 }
 
 void doGame(){//move the balls
+
+  int shipX = (int)myShip.getX();
+  int shipY = (int)myShip.getY();
+  int shipSize = (int)myShip.getSize();
+
   for(int y = myBalls.size()-1; y >= 0; y--){ //check all
      myBalls.get(y).left(); //move left
      if(myBalls.get(y).offscreen()){ //gone offscreen
        myBalls.remove(y); //get rid of it from the array
      }else{ //otherwise
        myBalls.get(y).draw(); //draw it on screen
-       if(myBalls.get(y).isat(mouseX,mouseY)){ //check if it touches the mouse
-         mybg = color(255,0,0); //collision bg color assignment
+
+       //check if any ball is touching the ship (testing at the corners of the ship triangle) and if the ships not already recovering from a previous collision
+       if(  
+             myShip.getRecoveryTime() == 0 
+          &&(myBalls.get(y).isat(shipX, shipY)  
+          || myBalls.get(y).isat(shipX+shipSize, shipY+shipSize/2)  
+          || myBalls.get(y).isat(shipX, shipY +shipSize))
+        ){
+         
+         
+         score -= 500;                //Take a hit out of the score if the player hits a ball
+         myShip.setRecoveryTime(50);  //Don't check for collisions for 50 cycles of the game loop
+         
+         //todo play a sound effect?
+       }
+       
+       //If the ship is in the midst of recovering from a collision, flash red background and fade it back out
+       if(myShip.getRecoveryTime() > 0){
+         mybg = color(myShip.getRecoveryTime()*5,0,0); //collision bg color assignment
        }
      }
    }
+   
+   
+   //Determine where ship should be moving
+   float dx = xMovement();
+   float dy = yMovement();
+   myShip.move(dx, dy);
+   myShip.decrementRecoveryTime();
+   score++;
 }
+
+
+//Determine which keys are being held related to the ships X movement and return -1 (left), 0 (stationary) or 1 (right)
+float xMovement(){
+  if(keysDown.containsKey("LEFT") && keysDown.get("LEFT") == true)return -1;
+  if(keysDown.containsKey("RIGHT") && keysDown.get("RIGHT") == true)return 1;
+  return 0;
+}
+
+
+//Determine which keys are being held  related to the ships Y direction
+float yMovement(){
+   if(keysDown.containsKey("UP") && keysDown.get("UP") == true)return -1;
+  if(keysDown.containsKey("DOWN") && keysDown.get("DOWN") == true)return 1;
+  return 0;
+}
+
+
+void keyPressed(){
+  if(key == CODED){
+
+    if (keyCode == LEFT){
+      keysDown.put("LEFT", true);
+    }
+
+    if(keyCode == RIGHT){
+      keysDown.put("RIGHT", true);
+    }
+    
+    if(keyCode == UP){
+       keysDown.put("UP", true);
+    }
+    
+    if(keyCode == DOWN){
+      keysDown.put("DOWN", true);
+    }
+    
+  }
+}
+
+void keyReleased(){
+  if(key == CODED){
+
+    if (keyCode == LEFT){
+      keysDown.put("LEFT", false);
+    }
+
+    if(keyCode == RIGHT){
+      keysDown.put("RIGHT", false);
+    }
+    
+    if(keyCode == UP){
+       keysDown.put("UP", false);
+    }
+   
+    if(keyCode == DOWN){
+      keysDown.put("DOWN", false);
+    }
+    
+  }
+}
+
 
 void doAnalysis(){
   //run all the calculations
