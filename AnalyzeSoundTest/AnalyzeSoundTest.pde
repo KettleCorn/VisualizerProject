@@ -21,7 +21,7 @@ import javax.swing.*;
 Minim minim; //audio processor object
 AudioPlayer jingle; //audio source (playback)
 AudioSample jingle2; //audio source (pre analysis)
-String filename = "ww2.mp3";
+String filename = "ww.mp3";
 
 FFT fft; //FFT to use
 float[] spectrum = new float[1024 / 2 + 1]; //hold all observed values from the fft transform
@@ -46,9 +46,17 @@ float maxFlux = 0; //store highest flux value for ratio usage
 int time = 0; //track milliseconds
 int starttime = 0; //track beginning of play
 
+
 /*********************
 * Game Logic Related *
 **********************/
+//my god its full of stars
+ParticleSystem ps;
+ParticleSystem ps2;
+ParticleSystem ps3;
+int particleIntensity = 4; //how many particles to make, roughly
+PImage sprite;   //base particle image
+
 color mybg; //store color value not really needed can be done dynamically quick
 Ball myBall; //object to hold temporary instances when making new ball objects
 ArrayList<Ball> myBalls = new ArrayList<Ball>(); //hold all the active ball objects
@@ -66,6 +74,9 @@ void setup() //run once
   size(1280, 400, P3D); //window size
   minim = new Minim(this);//init audio lib 
   
+  
+  sprite = loadImage("sprite.png"); //load particle image into memory
+  hint(DISABLE_DEPTH_MASK); //z-buffer saving
 }
 
 
@@ -101,6 +112,11 @@ void startGame(){
   myBalls.clear();
   score = 0;
   
+  //start a game set the particle emitters to be desired strength
+  ps = new ParticleSystem(particleIntensity * 250);
+  ps2 = new ParticleSystem(particleIntensity * 250);
+  ps3 = new ParticleSystem(particleIntensity * 250);
+  
   //analyze
   doAnalysis();
   running = true;
@@ -124,16 +140,31 @@ void draw() //called over and over
      text("Press O to open an audio file to play", 8, 42);
      text("Use the arrow keys to avoid the obstacles.", 8, 62);
      text("High Score: "+hiscore, 8, 82);
+     text("Current Particle Intensity Level: " + particleIntensity + " (press keys 1-8 to change)", 8, 102);
      return; 
   }
   
-  drawGraph(spectralFlux,color(0,255,255)); //draw the flux
-  drawGraph(peaks,color(0,255,0)); //draw the flux
-  drawGraph(threshold,color(255,255,255)); //draw the threshold
   time = millis() - starttime; //time since started playing
   spectraidx = int((time)/23.297);//convert to associated chunk index *****MAGIC NUMBER I WANT TO FIGURE OUT*******
   //println(spectraidx+","+spectras.length+","+peaks.size());
   if (spectraidx < spectras.length){ //if its in bounds
+  
+    drawGraph(spectralFlux,color(0,255,255)); //draw the flux only if new frame
+    // drawGraph(peaks,color(0,255,0)); //draw the highest fluxes
+    //drawGraph(threshold,color(255,255,255)); //draw the threshold
+    
+    //put particle emitters at correct locations and do emits 
+    ps.setEmitter(width*1/4,-10);
+    ps2.setEmitter(width*2/4,-10);
+    ps3.setEmitter(width*3/4,-10);
+    ps.update();
+    ps.display();
+    ps2.update();
+    ps2.display();
+    ps3.update();
+    ps3.display();
+    
+    drawFFT(spectraidx); //draw the frequencies for dynamic feel
       stroke(color(255,0,0)); //draw with red
       float fluxY = (height*4/5) - 
         (spectralFlux.get(spectraidx)/maxFlux) * (height*3/5); //3/4 down screen, up ratio of flux as percentage of highest, up to top of window
@@ -159,6 +190,9 @@ void draw() //called over and over
       //assign the background colour
       //blue based on beat, r/g based on relative amplitude
       mybg = color(64-amps[spectraidx]/2,amps[spectraidx],lastblue);  
+      ps.setRGB(int(amps[spectraidx])*2,int(amps[spectraidx])*2,lastblue);
+      ps2.setRGB(int(amps[spectraidx])*2,int(amps[spectraidx])*2,lastblue);
+      ps3.setRGB(int(amps[spectraidx])*2,int(amps[spectraidx])*2,lastblue);
     }else{
        //If the song is over and 5 seconds have passed, return to title screen
        if(millis() > jingle.length() + starttime + 5000){
@@ -226,6 +260,7 @@ void doGame(){//move the balls
    float dx = xMovement();
    float dy = yMovement();
    myShip.move(dx, dy);  //and move it!
+   shipSineJets(); //draw waveform as engine trails
    
    myShip.decrementRecoveryTime();
    
@@ -284,6 +319,30 @@ void keyPressed(){
     }
     if(key == 'o'){
       selectFile();
+    }
+    if(key == '1'){
+      particleIntensity = 1;
+    }
+    if(key == '2'){
+      particleIntensity = 2;
+    }
+    if(key == '3'){
+      particleIntensity = 3;
+    }
+    if(key == '4'){
+      particleIntensity = 4;
+    }
+    if(key == '5'){
+      particleIntensity = 5;
+    }
+    if(key == '6'){
+      particleIntensity = 6;
+    }
+    if(key == '7'){
+      particleIntensity = 7;
+    }
+    if(key == '8'){
+      particleIntensity = 8;
     }
   }
  
@@ -449,5 +508,26 @@ void drawGraph(ArrayList<Float> alf, color c){
     line(prevX,prevY,newX,newY);
     prevX = newX;
     prevY = newY;
+  }
+}
+
+void drawFFT(int time){ //draw each frequency chunk for current time as yellow line
+  int numVals = spectras[time].length;
+  stroke(color(170,200,0));
+  for (int n = 0; n < numVals; n++){
+    line(width- n/(float)numVals*width,0, width- n/(float)numVals*width, spectras[time][n] * 10);
+  }
+}
+    
+void shipSineJets(){
+  for(int i = 0; i < jingle.bufferSize() - 1; i++) //current playing audio
+  {
+    float x1 = map(i, 0, jingle.bufferSize(), 0, myShip.getX()); //scale between edge and ship
+    float x2 = map(i+1, 0, jingle.bufferSize(), 0, myShip.getX()); //scale between edge and ship
+    float y1 = myShip.getY() + 5;//upper engine point
+    float y2 = y1 - 10 + myShip.getSize(); //lower engine point
+    //draw waveform
+    line(x1, y1 + jingle.left.get(i)*30, x2, y1 + jingle.left.get(i+1)*30);
+    line(x1, y2 + jingle.right.get(i)*30, x2, y2 + jingle.right.get(i+1)*30);
   }
 }
