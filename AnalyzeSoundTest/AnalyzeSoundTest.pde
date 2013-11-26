@@ -21,7 +21,7 @@ import javax.swing.*;
 Minim minim; //audio processor object
 AudioPlayer jingle; //audio source (playback)
 AudioSample jingle2; //audio source (pre analysis)
-String filename = "hey.mp3";
+String filename = "ww2.mp3";
 
 FFT fft; //FFT to use
 float[] spectrum = new float[1024 / 2 + 1]; //hold all observed values from the fft transform
@@ -69,16 +69,16 @@ void setup() //run once
 }
 
 
-/*
+//Open a file chooser dialog box and let the user pick an audio file
+void selectFile(){
   JFileChooser chooser = new JFileChooser();
   chooser.setFileFilter(chooser.getAcceptAllFileFilter());
   int returnVal = chooser.showOpenDialog(null);
   if (returnVal == JFileChooser.APPROVE_OPTION) 
   {
-   filename = chooser.getSelectedFile().getAbsolutePath();
-   print(filename);
+   filename = chooser.getSelectedFile().getAbsolutePath(); 
   }
-*/
+}
 
 void startGame(){
   // specify that we want the audio buffers of the AudioPlayer
@@ -120,10 +120,10 @@ void draw() //called over and over
       mybg = color(0,0,0);
       fill(255);
      textSize(16);
-     text("Press S to start. Esc to return to title screen", 8, 22);
-     text("Use the arrow keys to avoid the obstacles.", 8, 42);
-     text("(audio file select dialog box? Prettier title screen?)", 8, 82);
-     text("High Score: "+hiscore, 8, 62);
+     text("Press S to start", 8, 22);
+     text("Press O to open an audio file to play", 8, 42);
+     text("Use the arrow keys to avoid the obstacles.", 8, 62);
+     text("High Score: "+hiscore, 8, 82);
      return; 
   }
   
@@ -277,9 +277,16 @@ void keyPressed(){
       key=0;  //prevent default handler
       backToTitle();  //go to title
     }
-  if(key == 's' && running == false){
-    startGame();
+
+  if(running == false){
+    if(key == 's'){
+      startGame();
+    }
+    if(key == 'o'){
+      selectFile();
+    }
   }
+ 
 }
 
 void keyReleased(){
