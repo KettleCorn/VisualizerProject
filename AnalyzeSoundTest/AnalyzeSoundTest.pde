@@ -13,6 +13,7 @@ import ddf.minim.*;
 import ddf.minim.spi.*;
 import java.util.Arrays;
 import java.util.Map;
+import javax.swing.*;
 
 /************************
 * Audio Logic Variables *
@@ -54,7 +55,8 @@ ArrayList<Ball> myBalls = new ArrayList<Ball>(); //hold all the active ball obje
 Ship myShip = new Ship();
 int lastblue = 0; //previous blue value of background
 int score = 0;
-
+int hiscore = 0;
+boolean running = false;
 //Keep track of which arrow keys are down for ship movement
 HashMap<String, Boolean> keysDown = new HashMap<String, Boolean>();
 
@@ -62,22 +64,46 @@ void setup() //run once
 {
   frameRate(120); //if possible
   size(1280, 400, P3D); //window size
-  minim = new Minim(this);//init audio lib
+  minim = new Minim(this);//init audio lib 
   
+}
+
+
+/*
+  JFileChooser chooser = new JFileChooser();
+  chooser.setFileFilter(chooser.getAcceptAllFileFilter());
+  int returnVal = chooser.showOpenDialog(null);
+  if (returnVal == JFileChooser.APPROVE_OPTION) 
+  {
+   filename = chooser.getSelectedFile().getAbsolutePath();
+   print(filename);
+  }
+*/
+
+void startGame(){
   // specify that we want the audio buffers of the AudioPlayer
   // to be 1024 samples long because our FFT needs to have 
   // a power-of-two buffer size and this is a good size.
+ 
   jingle = minim.loadFile(filename, 1024);
   jingle2 = minim.loadSample(filename,1024);
-  
+ 
   //visual environment
   mybg = color(0,0,0);//set black background
   background(mybg);//apply
   
+  
+  //Initialize everything
+  spectralFlux.clear();
+  threshold.clear();
+  prunedFlux.clear();
+  peaks.clear();
+  myBalls.clear();
+  score = 0;
+  
   //analyze
   doAnalysis();
-  
-  //and go
+  running = true;
   time = millis(); //track time
   starttime = time; //start time
   jingle.play(); //begin playback
@@ -85,7 +111,22 @@ void setup() //run once
 
 void draw() //called over and over
 {
+  
   background(mybg); //redraw background first
+  
+  //Show a title screen when the game is not running
+  if(!running){
+     if(score > hiscore)hiscore = score;
+      mybg = color(0,0,0);
+      fill(255);
+     textSize(16);
+     text("Press S to start. Esc to return to title screen", 8, 22);
+     text("Use the arrow keys to avoid the obstacles.", 8, 42);
+     text("(audio file select dialog box? Prettier title screen?)", 8, 82);
+     text("High Score: "+hiscore, 8, 62);
+     return; 
+  }
+  
   drawGraph(spectralFlux,color(0,255,255)); //draw the flux
   drawGraph(peaks,color(0,255,0)); //draw the flux
   drawGraph(threshold,color(255,255,255)); //draw the threshold
@@ -100,6 +141,7 @@ void draw() //called over and over
      
       stroke(color(255,255,0)); //yellow
       float timeX = spectraidx/float(spectras.length) * width; //percentage of index progress converted to percentage of window size
+
       line(timeX,0,timeX,height); //draw a vertical time bar
       
       stroke(255); //go back to white
@@ -117,18 +159,27 @@ void draw() //called over and over
       //assign the background colour
       //blue based on beat, r/g based on relative amplitude
       mybg = color(64-amps[spectraidx]/2,amps[spectraidx],lastblue);  
+    }else{
+       //If the song is over and 5 seconds have passed, return to title screen
+       if(millis() > jingle.length() + starttime + 5000){
+         running = false;
+       }
     }
    lastidx = spectraidx;//just done index point
+
    myShip.draw();
+
    textSize(20);
    fill(255,255,255);
    text("Score: "+score, 8, 22);
+
    doGame(); //update balls and ship movement
    
 }
 
 void makeABall(float size){//take a size and make a ball on the right of the screen
-    size *= 4;
+    if(size<6)return;
+    size *= 3;
     myBall = new Ball(size);  
     myBall.setX(width);
     myBall.setY(height/2+random(-height/3,height/3));
@@ -160,7 +211,7 @@ void doGame(){//move the balls
          score -= 500;                //Take a hit out of the score if the player hits a ball
          myShip.setRecoveryTime(50);  //Don't check for collisions for 50 cycles of the game loop
          
-         //todo play a sound effect?
+         //todo play a sound effect or soemthing?
        }
        
        //If the ship is in the midst of recovering from a collision, flash red background and fade it back out
@@ -174,9 +225,11 @@ void doGame(){//move the balls
    //Determine where ship should be moving
    float dx = xMovement();
    float dy = yMovement();
-   myShip.move(dx, dy);
+   myShip.move(dx, dy);  //and move it!
+   
    myShip.decrementRecoveryTime();
-   score++;
+   
+   score++;  //Increment score counter
 }
 
 
@@ -195,6 +248,10 @@ float yMovement(){
   return 0;
 }
 
+void  backToTitle(){
+  running = false;
+  jingle.pause(); 
+}
 
 void keyPressed(){
   if(key == CODED){
@@ -215,6 +272,13 @@ void keyPressed(){
       keysDown.put("DOWN", true);
     }
     
+  }
+  if (key == ESC && running == true){
+      key=0;  //prevent default handler
+      backToTitle();  //go to title
+    }
+  if(key == 's' && running == false){
+    startGame();
   }
 }
 

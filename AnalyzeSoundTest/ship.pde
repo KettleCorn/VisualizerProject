@@ -9,7 +9,7 @@ class Ship{
   
   Ship(){
     size = 30; 
-    speed = 4;
+    speed = 5;
     y = 160;
     x = 40;
   }
