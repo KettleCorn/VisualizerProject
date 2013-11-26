@@ -132,9 +132,9 @@ void draw() //called over and over
   
   //Show a title screen when the game is not running
   if(!running){
-     if(score > hiscore)hiscore = score;
-      mybg = color(0,0,0);
-      fill(255);
+     if(score > hiscore)hiscore = score;  //move this
+     mybg = color(0,0,0);
+     fill(255);
      textSize(16);
      text("Press S to start", 8, 22);
      text("Press O to open an audio file to play", 8, 42);
@@ -216,7 +216,8 @@ void makeABall(float size){//take a size and make a ball on the right of the scr
     size *= 3;
     myBall = new Ball(size);  
     myBall.setX(width);
-    myBall.setY(height/2+random(-height/3,height/3));
+    //myBall.setY(height/2+random(-height/2,height/2));
+    myBall.setY(random(0, height));
     myBalls.add(myBall);
 }
 
